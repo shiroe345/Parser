@@ -30,14 +30,9 @@ fnumber ({digit}*\.{digit}+)
 <CMT>\n     {;}
 <CMT>.      {;}
 "//".*      {;}
-"\""        { BEGIN(STRCOND);
-                return '"';
-            }
-<STRCOND>"\""   { BEGIN(INITIAL);
-                return '"';
-            }
-<STRCOND>[^\"]* { yylval.s_val = strdup(yytext);
-                return STRING_LIT;
+
+"\""[^\"]*"\""  { yylval.s_val = strdup(yytext);
+                    return STRING_LIT;
             }
 "str"       { return STR; }
 ">>"        { return RSHIFT; }

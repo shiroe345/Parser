@@ -30,6 +30,22 @@
     /* Global variables */
     bool HAS_ERROR = false;
     static int scope_level = -1;
+    static int addr = -1;
+    char type[10];
+
+    struct Symbol{
+        char name[1000][100];
+        int mut[1000];
+        char type[1000][10];
+        int addr[1000];
+        int lineno[1000];
+        char func_sig[1000][100];
+        int size;
+    };
+
+    typedef struct Symbol symbol;
+
+    symbol stack[100];
 %}
 
 %error-verbose
@@ -87,17 +103,17 @@ GlobalStatement
 ;
 
 FunctionDeclStmt
-    : declaration_specifiers declarator declaration_list compound_statement
-	| declaration_specifiers declarator compound_statement
-	| declarator declaration_list compound_statement
-	| declarator compound_statement
+    : declaration_specifiers declarator declaration_list compound_statement 
+	| declaration_specifiers declarator compound_statement 
+	| declarator declaration_list compound_statement 
+	| declarator compound_statement 
 ;
 
 primary_expression
-	: IDENT
-    | INT_LIT
-	| STRING_LIT
-    | FLOAT_LIT
+	: IDENT { printf("IDENT (name=%s, address=%d)\n", $<s_val>1, ++addr); }
+    | INT_LIT { printf("INT_LIT %d\n", $<i_val>1); strcpy(type, "i32");}
+	| STRING_LIT { printf("STRING_LIT %s\n", $<s_val>1); strcpy(type, "str"); }
+    | FLOAT_LIT { printf("FLOAT_LIT %f\n", $<f_val>1); strcpy(type, "f32"); }
 	| '(' expression ')'
 	;
 
@@ -229,7 +245,7 @@ declaration_specifiers
 	: type_specifier
 	| type_specifier declaration_specifiers
     | func_specifier 
-    | func_specifier declaration_specifiers
+    | func_specifier declaration_specifiers 
 	;
 
 init_declarator_list
@@ -243,13 +259,13 @@ init_declarator
 	;
 
 func_specifier
-    : FUNC
+    : FUNC { printf("func: "); strcpy(type, "func"); }
     ;
 
 type_specifier
-	: INT
-	| FLOAT
-    | BOOL
+	: INT 
+	| FLOAT 
+    | BOOL 
     | STR
 	| Type
 	;
@@ -257,43 +273,10 @@ type_specifier
 Type
     :
 
-struct_declaration_list
-	: struct_declaration
-	| struct_declaration_list struct_declaration
-	;
-
-struct_declaration
-	: specifier_qualifier_list struct_declarator_list ';'
-	;
-
 specifier_qualifier_list
 	: type_specifier specifier_qualifier_list
 	| type_specifier
 	;
-
-struct_declarator_list
-	: struct_declarator
-	| struct_declarator_list ',' struct_declarator
-	;
-
-struct_declarator
-	: declarator
-	| ':' constant_expression
-	| declarator ':' constant_expression
-	;
-
-
-enumerator_list
-	: enumerator
-	| enumerator_list ',' enumerator
-	;
-
-enumerator
-	: IDENT
-	| IDENT '=' constant_expression
-	;
-
-
 
 declarator
 	: pointer direct_declarator
@@ -301,7 +284,12 @@ declarator
 	;
 
 direct_declarator
-	: IDENT
+	: IDENT { printf("%s\n", $<s_val>1);
+            if(strcmp(type, "func") == 0){
+                insert_symbol($<s_val>1, -1);
+                create_symbol();
+            }
+    }
 	| '(' declarator ')'
 	| direct_declarator '[' constant_expression ']'
 	| direct_declarator '[' ']'
@@ -314,9 +302,6 @@ pointer
 	: '*'
 	| '*' pointer
 	;
-
-
-
 
 parameter_type_list
 	: parameter_list
@@ -387,10 +372,10 @@ labeled_statement
 	;
 
 compound_statement
-	: '{' '}' { create_symbol(); }
-	| '{' statement_list '}' { create_symbol(); }
-	| '{' declaration_list '}' { create_symbol(); }
-	| '{' declaration_list statement_list '}' { create_symbol(); }
+	: '{' '}' 
+	| '{' statement_list '}' 
+	| '{' declaration_list '}' 
+	| '{' declaration_list statement_list '}' 
 	;
 
 declaration_list
@@ -426,10 +411,8 @@ jump_statement
 	;
 
 print_statement
-    : PRINT '(' '"' STRING_LIT '"' ')' ';'
-    | PRINT '(' expression ')' ';'
-    | PRINTLN '(' '"' STRING_LIT '"' ')' ';'
-    | PRINTLN '(' expression ')' ';'
+    : PRINT '(' expression ')' ';' { printf("PRINT %s\n", type); }
+    | PRINTLN '(' expression ')' ';' { printf("PRINTLN %s\n", type); }
     ;
 
 %%
@@ -455,19 +438,30 @@ int main(int argc, char *argv[])
 
 static void create_symbol() {
     printf("> Create symbol table (scope level %d)\n", ++scope_level);
+    stack[scope_level].size = 0;
 }
-
-static void insert_symbol() {
-    printf("> Insert `%s` (addr: %d) to scope level %d\n", "XXX", 0, 0);
+static void insert_symbol(char *str, int addr) {
+    printf("> Insert `%s` (addr: %d) to scope level %d\n", str, addr, scope_level);
+    int cur_size = stack[scope_level].size;
+    strcpy(stack[scope_level].name[cur_size], str);
+    stack[scope_level].mut[cur_size] = strcmp(type, "func") ? 0 : -1;  
+    strcpy(stack[scope_level].type[cur_size], type);
+    stack[scope_level].addr[cur_size] = strcmp(type, "func") ? addr++ : -1;  
+    stack[scope_level].lineno[cur_size] = yylineno+1;
+    strcpy(stack[scope_level].func_sig[cur_size], strcmp(type, "func") ? "-" : "(V)V" );
+    stack[scope_level].size++;
 }
 
 static void lookup_symbol() {
 }
 
 static void dump_symbol() {
-    printf("\n> Dump symbol table (scope level: %d)\n", scope_level--);
+    printf("\n> Dump symbol table (scope level: %d)\n", scope_level);
     printf("%-10s%-10s%-10s%-10s%-10s%-10s%-10s\n",
         "Index", "Name", "Mut","Type", "Addr", "Lineno", "Func_sig");
-    printf("%-10d%-10s%-10d%-10s%-10d%-10d%-10s\n",
-            0, "name", 0, "type", 0, 0, "func_sig"); 
+    for(int i = 0;i<stack[scope_level].size;i++){
+        printf("%-10d%-10s%-10d%-10s%-10d%-10d%-10s\n",
+                i, stack[scope_level].name[i], stack[scope_level].mut[i], stack[scope_level].type[i], stack[scope_level].addr[i], stack[scope_level].lineno[i], stack[scope_level].func_sig[i]); 
+    }
+    scope_level--;
 }

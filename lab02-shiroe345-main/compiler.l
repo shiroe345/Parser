@@ -65,8 +65,8 @@ fnumber ({digit}*\.{digit}+)
 ")"         { return ')'; }
 "["         { return '['; }
 "]"         { return ']'; }
-"{"         { create_symbol();  return '{';  }
-"}"         { dump_symbol(); return '}'; }
+"{"         { if(!if_while) create_symbol(); para = 0; return '{';  }
+"}"         { return '}'; }
 ":"         { return ':'; }
 ";"         { return ';'; }
 ","         { return ','; }
@@ -75,11 +75,11 @@ fnumber ({digit}*\.{digit}+)
 "println"   { return PRINTLN; }
 "\.\."      { return DOTDOT; }
 "as"        { return AS; }
-"if"        { return IF; }
+"if"        { if_while = 1; return IF; }
 "else"      { return ELSE; }
 "for"       { return FOR; }
-"while"     { return WHILE; }
-"loop"      {return LOOP; }
+"while"     { if_while = 1; return WHILE; }
+"loop"      {strcpy(loo, name); return LOOP; }
 "i32"       { return INT; }
 "f32"       { return FLOAT;}
 "bool"      { return BOOL; }
